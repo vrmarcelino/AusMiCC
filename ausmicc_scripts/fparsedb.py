@@ -23,3 +23,12 @@ def convNaN2None(in_df):
     in_df = in_df.astype(object).where(pd.notnull(in_df), None)
     return (in_df)
 
+
+# read files that will be saved as bool
+# "rb" mode opens the file in binary format for reading, 
+def read_bloob(filename):
+    with open(filename, 'rb') as f:
+        blob_file = f.read()
+    return (blob_file)
+
+
