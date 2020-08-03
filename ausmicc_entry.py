@@ -11,6 +11,7 @@ Created on Thu Jul  2 08:34:16 2020
 """
 
 #imports
+import mysql.connector # not used in this script, but needed to avoid a segmentation fault
 import pandas as pd
 from argparse import ArgumentParser
 import sys

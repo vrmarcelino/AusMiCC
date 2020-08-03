@@ -44,6 +44,8 @@ def format_table(in_df):
     return (in_df)
 
 
+
+
 def add_plate(in_df, in_cursor):
 
     #### add plate information:
@@ -58,11 +60,25 @@ def add_plate(in_df, in_cursor):
         exit(-1)
     
     for index, row in plate_info.iterrows():
-        query = "INSERT INTO plate (plate_name,plate_freezer_location) VALUES (%s, %s)"
-        val = (row['plate_name'], row['plate_freezer_location'])
-  
+        
+        pl_name = row['plate_name']
+        # check if plate exists in db first:
+        query = "SELECT plate_name FROM plate WHERE plate_name = %s"
+        val = (pl_name,)
+        
         in_cursor.execute(query, val)
-        print ("Added plate %s to the database\n" %(row['plate_name']))
+        existing_plate_name = in_cursor.fetchall()
+        
+        # if exists, skip it:
+        if len(existing_plate_name) > 0:
+            print ("Plate %s already in database, skipping." %(pl_name))
+        
+        else:
+            query = "INSERT INTO plate (plate_name,plate_freezer_location) VALUES (%s, %s)"
+            val = (row['plate_name'], row['plate_freezer_location'])
+  
+            in_cursor.execute(query, val)
+            print ("Added plate %s to the database\n" %(pl_name))
         
 
 
