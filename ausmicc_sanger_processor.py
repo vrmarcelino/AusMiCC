@@ -5,7 +5,7 @@ Process 16S (sanger) sequencing data.
 
 Created on Aug 18 2020
 
-@author: V.R.Marcelino - most code copied from S. Forster
+@author: most code copied from S. Forster
 
 """
 
@@ -31,12 +31,9 @@ aus_db_conn = fconnector.db_connection()
 cursor = aus_db_conn.cursor()
 
 ## Define paths:
-blastdb = path_structure.ref_db()
+ref_databases = path_structure.ref_db()
 
-#redefine path when using locally:
-blastdb.blastdb_16Smicro = '/Users/vmar0011/Documents/Programs_dev/16Sblastdb/16SMicrobial'
-
-blastdb_16S = blastdb.blastdb_16Smicro
+blastdb = ref_databases.blastdb_16Smicro
 
 
 ### set variables:
@@ -44,7 +41,7 @@ ncount = 1
 cutoff = ['-g']
 sequenceHash = {}
 outputfile = "AllSequences.fna"
-
+__version__ = "version 1.2"
 
 #Cutoff Hash Values
 cutoffhash = {}

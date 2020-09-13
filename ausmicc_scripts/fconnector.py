@@ -15,8 +15,8 @@ import mysql.connector
 ### SQL settings
 MYSQL_HOST='localhost'
 MYSQL_USER='root'
-MYSQL_PWD='MyGodness4!'
-MYSQL_DB='ausmicc_local'
+MYSQL_PWD='4*4Genomes'
+MYSQL_DB='ausmicc_001'
 
 
 ### Function to connect to the database
