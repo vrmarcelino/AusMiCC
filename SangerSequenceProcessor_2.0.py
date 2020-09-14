@@ -10,27 +10,33 @@ import ntpath
 import re
 from pathlib import Path
 
+# local imports
+from ausmicc_scripts import fconnector
+from ausmicc_scripts import path_structure
+from ausmicc_scripts import fparsedb
+from ausmicc_scripts import fsample
+from ausmicc_scripts import fisolate
+
 import time
 start_time = time.time()
 
-#import pymysql.cursors
 
 from Bio import SeqIO
 
-__version__ = "version 1.18"
+__version__ = "version 2.0"
 
-blastdb = "/home/ref_databases/BlastDBs/16SMicrobial"
+databases=path_structure.ref_db()
+blastdb = databases.blastdb_16Smicro
+
 ncount = 1
 cutoff = ['-g']
 sequenceHash = {}
 outputfile = "AllSequences.fna"
 
+### connect to the database:
+aus_db_conn = fconnector.db_connection()
+cursor = aus_db_conn.cursor()
 
-#Database
-MYSQL_HOST = "localhost"
-MYSQL_USER = "root"
-MYSQL_PWD = "rtpsn123"
-MYSQL_DB = "msbl"
 
 #Cutoff Hash Values
 cutoffhash = {}
@@ -68,7 +74,7 @@ replacementnames = {}
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', dest='directory', help='A directory to process and import all sequences into single file')
 parser.add_argument('-f', dest='file', help='A file to import sequences from')
-parser.add_argument('-t', dest='threads', type=int, default=1, help='The number threads to use for analysis [1]')
+parser.add_argument('-t', dest='threads', type=int, default=4, help='The number threads to use for analysis [4]')
 parser.add_argument('-q', dest='quality', type=int, default=40, help='Average sequence quality score below which a sequence will be filtered. [40]')
 parser.add_argument('-p', dest='paired',  action='store_true', help='Only keep that have both forward and reverse pairs')
 parser.add_argument('-m', dest='minlength', default=400, type=int, help='The minimum length sequence to retain [400]')
@@ -84,7 +90,9 @@ parser.add_argument('-S', dest='modifyfile', help='Tab delimited file in the for
 parser.add_argument('-F', dest='forward', action='store_true', help='Use this flag to add _7f to each sequence automatically')
 parser.add_argument('-R', dest='reverse', action='store_true', help='Use this flag to add _1510r to each sequence automatically')
 
-parser.add_argument('--taxonomy', dest='taxonomy', action='store_true', help='Use this flag to include the taxonomy step in analysis')
+parser.add_argument('--taxonomy', default='Y', help="Use this flag to include the taxonomy step in analysis, options are 'Y' and 'N'. default=Y", required=False)
+parser.add_argument('--add2db', default='Y', help="Add data to the AusMiCC database, options are 'Y' and 'N'. default=Y", required=False)
+
 parser.add_argument('--align', dest='align', action='store_true', help='Use this flag to include alignment step in analysis')
 parser.add_argument('--tree', dest='tree', action='store_true', help='Use this flag to include tree generation step in analysis')
 
@@ -93,11 +101,6 @@ parser.add_argument('-v', dest='verbose', action='store_true', default = False, 
 parser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
 
 args = parser.parse_args()
-
-# test:
-#in_dir="/home/vmar0011/raw_16S_small_test"
-
-
 
 if args.directory is None and args.file is None:
 	print("Neither directory (-d) or file (-f) containing fasta sequences is defined. One must be defined")
@@ -230,7 +233,7 @@ def clean_sequence(header, seq, forward):
 	#First check it only contains valid characters
 	if not valid_seq_characters(seq):
 		if args.verbose:
-			print(header + ": Invalid charcters")
+			print(header + ": Invalid characters")
 		return None
 		
 	#First remove N's
@@ -432,8 +435,10 @@ cleanedfasta = cleanedfasta.replace(".fasta", ".fna")
 cleanedfasta = cleanedfasta.replace(".fa", ".fna")
 cleanedfasta = cleanedfasta.replace(".fna", ".cleaned.fna")
 
+
 cleanedfastaoutput = open(cleanedfasta, "w")
 for key in sequenceHash:
+	print (key)
 	cleanedfastaoutput.write(">" + key + "\n" + sequenceHash[key] + "\n")
 cleanedfastaoutput.close()
 
@@ -511,12 +516,16 @@ if args.known is not None:
 		knownline = knownline.replace("\n", "")
 		knownhash[knownline] = 1
 		print("Adding '" + knownline + "' to knownhash", flush=True)
-		
+
+
 #Now write results
 results = open("Results.txt", "w")
 results.write("Genome ID\tBlast Match\tSequence Length\tAlignment Length\tIdentity\tE-value\tCoverage\tOTU Count\tCultured OTUs\tAll OTUs\n")
 
+
 otufile = open(cleanedfasta + ".cluster.list", "r")
+
+
 otucount = 0
 
 for otuline in otufile.readlines():
@@ -558,7 +567,7 @@ if len(sequenceHash) == 1:
 ######################################
 #     Generate Taxonomy File
 ######################################
-if args.taxonomy:
+if args.taxonomy == 'Y':
 	print("Generating Taxonomy File...", flush=True)
 	if args.verbose : print("\t--- %s seconds ---" % (time.time() - start_time))
 	section_start_time = time.time()
@@ -566,6 +575,10 @@ if args.taxonomy:
 	p.wait()
 	if args.verbose : print("\t--- %s Section seconds ---" % (time.time() - section_start_time))
 
+elif args.taxonomy == 'N':
+	pass
+else:
+	print ("--taxonomy must be either 'N' or 'Y'. Skipping taxids calculcation")
 	
 ######################################
 #     Perform alignment
@@ -637,4 +650,11 @@ print("Completed Analysis")
 if args.verbose : print("\t--- %s Seconds ---" % (time.time() - start_time))
 
 
-
+######################################
+#    Add info to AusMiCC database
+######################################
+if args.add2db == 'Y':
+	print ("copying ab1 files of sequences that passed QC to database folders...")
+	amplicon_paths = path_structure.amplicon_paths()
+	p = subprocess.Popen(["rsync","-avzh",args.directory,amplicon_paths.ab1_collec], stdout=subprocess.PIPE)
+	p.wait()
