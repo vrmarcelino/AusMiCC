@@ -24,7 +24,6 @@ def add_16S_record(in_obj, in_cursor):
     val = (idisolate,in_obj.ab1_loc,partial_sequence,in_obj.primer)
 
     in_cursor.execute(query, val)
-    print ("Added %s, %s record to the database\n" %(in_obj.isolate_name, in_obj.primer))
 
 def update_isolate_info(in_obj,in_cursor):
     isolateid_map = fconnector.get_ids([in_obj.isolate_name], 'isolate', in_cursor)
@@ -35,7 +34,7 @@ def update_isolate_info(in_obj,in_cursor):
         full_len_sequence = ''.join(format(i, 'b') for i in bytearray(in_obj.full_len_sequence, encoding ='utf-8'))
     else:
         full_len_sequence = None
-        print ("no full length sequence found for %s" %(in_obj.isolate_name))
+        print ("No full length sequence found for %s." %(in_obj.isolate_name))
 
     query = "UPDATE isolate set full_length_seq=%s,species=%s,species_taxid=%s WHERE idisolate=%s"
     val = (full_len_sequence,in_obj.species, in_obj.sp_taxid,idisolate)

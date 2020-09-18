@@ -770,7 +770,6 @@ if args.taxonomy == 'Y':
 	# now add to the MySQL:
 	print ("\nInteracting with MySQL\n")
 	for obj in new_db_entries:
-		print(obj.isolate_name, obj.species, obj.full_len_sequence, obj.primer, obj.sequence)
 
 		# add info to the 16S table:
 		fadd16S.add_16S_record(obj,cursor)
