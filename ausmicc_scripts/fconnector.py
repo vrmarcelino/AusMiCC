@@ -76,6 +76,8 @@ def get_ids(names, table, cursor):
         if len(wanted_ids) > 1:
             print ("more than one entry found for name %s" %(name))
             exit(-1)
+        elif len(wanted_ids) == 0:
+            print ("\nSample %s not found in the database - make sure it has been added before and that there are no differences in the name (e.g. A1 vs A01)\n" %(name))
         else:
             names2ids[name] = wanted_ids [0][0]
      

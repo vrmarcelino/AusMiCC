@@ -98,14 +98,13 @@ def add_isolate(in_df, in_cursor):
     plate_names = in_df['plate_name'].drop_duplicates()
     plateid_map = fconnector.get_ids(plate_names,'plate',in_cursor)
 
-
     ### add isolate information
     for index, row in in_df.iterrows():
 
-        query = "INSERT INTO isolate {} VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(col_names).replace("'","`")
+        query = "INSERT INTO isolate {} VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)".format(col_names).replace("'","`")
         val = (row['isolate_name'], sampleid_map[row['sample_name']],plateid_map[row['plate_name']],
            None,None,None, row['isolate_barcode'], None,None,row['isolation_date'], row['isolation_media'],
-           row['colony_color'],row['colony_margin'],row['colony_form'],row['colony_elevation'],
+           row['colony_color'],row['colony_margin'],row['colony_elevation'],row['colony_form'],row['colony_surface'],
            row['spore_former'],row['growth_plate'],row['growth_plate_image'],
            row['growth_broth'], row['growth_broth_image'], row['growth_aerobic'],
            row['growth_anaerobic'], row['growth_microaerophilic'], None, row['process_status'], row['access_status'])

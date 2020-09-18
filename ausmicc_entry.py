@@ -39,7 +39,7 @@ df_fp = args.input_fp
 mode = args.mode
 in_isolate_name = args.isolate_name
 
-#df_fp = '/Users/vmar0011/Sync/02_Projects/0_AUS Microbiome/Example_entry_tables/Phase1_isolate_info.txt'
+#df_fp = '/home/vmar0011/Phase1_isolate_info_ab1_test.txt'
 #mode = 'isolate'
 #in_isolate_name = "AMR001_A2"
 
@@ -82,14 +82,12 @@ if mode == 'sample':
 if mode == 'isolate':
     df = fisolate.format_table(df)  
 
-    fisolate.add_plate(df, cursor)
+    fisolate.add_plate(df,cursor)
   
     fisolate.add_isolate(df,cursor)
 
     aus_db_conn.commit() 
     print ("\nDone!\n")
-
-
 
 #aus_db_conn.commit()
 aus_db_conn.close()

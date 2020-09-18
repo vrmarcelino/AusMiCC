@@ -9,17 +9,19 @@ import shutil
 import ntpath
 import re
 from pathlib import Path
+from ete3 import NCBITaxa
 
 # local imports
 from ausmicc_scripts import fconnector
 from ausmicc_scripts import path_structure
+from ausmicc_scripts import ctables
 from ausmicc_scripts import fparsedb
 from ausmicc_scripts import fsample
 from ausmicc_scripts import fisolate
+from ausmicc_scripts import fadd16S
 
 import time
 start_time = time.time()
-
 
 from Bio import SeqIO
 
@@ -31,11 +33,8 @@ blastdb = databases.blastdb_16Smicro
 ncount = 1
 cutoff = ['-g']
 sequenceHash = {}
+sequenceHash_single_end = {}
 outputfile = "AllSequences.fna"
-
-### connect to the database:
-aus_db_conn = fconnector.db_connection()
-cursor = aus_db_conn.cursor()
 
 
 #Cutoff Hash Values
@@ -223,7 +222,7 @@ def remove_Ns(seq, start):
 			trimming = False
 			
 	if not start:
-		#reverse teh sequence
+		#reverse the sequence
 		seq = seq[::-1]
 
 	return seq
@@ -287,9 +286,14 @@ def add_sequence(header, sequence):
 			if id not in sequenceHash:
 				if isForward(header):
 					FwdIdHash[id] = 1
+					header_note = "_Fwd"
 				if isReverse(header):
 					RevIdHash[id] = 1
+					header_note = "_Rev"
 				sequenceHash[id] = sequence
+				# also store in a dict that will keep the single-end sequences
+				id_for_single_end = id + header_note
+				sequenceHash_single_end[id_for_single_end] = sequence
 			else:
 				if id not in CombinedIdHash:
 					#if the value being added is the same orientation as those that are already present just check length
@@ -305,9 +309,12 @@ def add_sequence(header, sequence):
 						if isReverse(header):
 							create_fasta_file("f.fna", id, sequenceHash[id])
 							create_fasta_file("r.fna", id, sequence)
+							header_note = "_Rev"
 						else:
 							create_fasta_file("f.fna", id, sequence)
 							create_fasta_file("r.fna", id, sequenceHash[id])
+							header_note = "_Fwd"
+
 						print("Merging: " + header)
 						p = subprocess.Popen(["merger", "f.fna", "r.fna", "-sreverse2", "-outseq", "merged.fna", "-outfile", "temp.merger", "-gapopen", "100", "-gapextend", "2"], stdout=subprocess.PIPE)
 						p.wait()
@@ -317,7 +324,11 @@ def add_sequence(header, sequence):
 				
 						#Store the fact sequences were combined
 						CombinedIdHash[id] = 1
-				
+
+						# add info to single-end dictionary:
+						id_for_single_end = id + header_note
+						sequenceHash_single_end[id_for_single_end] = sequence
+
 						#Remove temporary files
 						os.remove("f.fna")
 						os.remove("r.fna")
@@ -370,15 +381,18 @@ def import_sequence_from_ab1(file):
 
 	if total/bases > args.quality:
 		add_sequence(file.replace(".ab1", ""), str(record.seq))
+		return file
 	else:
 		if args.verbose:
 			print("Skipping " + record.id + " due to low sequence quality: " + str(total/bases))
 
+
 #Generic method for importing sequence file
 def import_sequence_file(filename):
 	if is_ab1_sequence_filetype(filename):
-		if args.verbose : print("Importing ab1 File") 
-		import_sequence_from_ab1(filename)
+		if args.verbose : print("Importing ab1 File")
+		added_files = import_sequence_from_ab1(filename)
+		return added_files
 	if is_fasta_sequence_filetype(filename):
 		print("WARNING: Skipping " + filename + " as it is not an ab1 file")
 	if is_seq_filetype(filename):
@@ -390,7 +404,29 @@ def import_sequence_file(filename):
 def delete_file(filename):
 	if os.path.exists(filename):
 		os.remove(filename)
-	
+
+# Function that converts a strain taxid to a species-level taxid.
+# also returns the species-level classification:
+def get_sp_taxid(query_taxid):
+	if query_taxid != 'NOVEL':
+		ncbi = NCBITaxa()
+		query_taxid = int(query_taxid)
+		lineage = ncbi.get_lineage(query_taxid)
+		ranks = ncbi.get_rank(lineage)
+		names = ncbi.get_taxid_translator(lineage)
+
+		for key, val in ranks.items():
+			if val == 'species':
+				sp_taxid = key
+				sp_name = names[key]
+	else:
+		sp_taxid = 0
+		sp_name = 'unk_sp'
+
+	species_info = [sp_taxid,sp_name]
+	return species_info
+
+
 
 ########################################################################################################
 #     Import the files, ensure they are reasonable quality and write cleaned fasta file
@@ -402,18 +438,23 @@ section_start_time = time.time()
 
 #If Modify File has been specified set this up
 if args.modifyfile is not None:
-	if args.verbose : print("Modifying file name headers using " + args.modifyfile)
+	if args.verbose: print("Modifying file name headers using " + args.modifyfile)
 	modify_file_import()
 
 #Import sequences and ensure they are reasonable quality
+imported_files = []
 if args.file is not None:
-	import_sequence_file(args.file)
+	try_import = import_sequence_file(args.file)
+	if try_import != None:
+		imported_files.append(try_import)
 
-if args.directory is not None: 
+if args.directory is not None:
 	for filename in os.listdir(args.directory):
-		if args.verbose is not None: print(filename) 
-		import_sequence_file(args.directory + os.sep + filename)
-		
+		if args.verbose is not None: print(filename)
+		try_import = import_sequence_file(args.directory + os.sep + filename)
+		if try_import != None:
+			imported_files.append(try_import)
+
 #if paired has been specified filter file
 if args.paired:
 	keys = list()
@@ -560,9 +601,9 @@ print("\tFound " + str(otucount) + " OTUs for analysis", flush=True)
 if args.verbose : print("\t--- %s Section seconds ---" % (time.time() - section_start_time))
 
 
-if len(sequenceHash) == 1:
-	print("\tOnly 1 sequences provided. Skipping Alignment and Tree Building")
-	exit(-1)
+#if len(sequenceHash) == 1:
+#	print("\tOnly 1 sequences provided. Skipping Alignment and Tree Building")
+#	exit(-1)
 
 ######################################
 #     Generate Taxonomy File
@@ -583,7 +624,7 @@ else:
 ######################################
 #     Perform alignment
 ######################################
-if args.align or args.tree:
+if (args.align or args.tree) and len(sequenceHash) > 1:
 	print("Performing alignment...", flush=True)
 	if args.verbose : print("\t--- %s seconds ---" % (time.time() - start_time))
 	section_start_time = time.time()
@@ -653,8 +694,94 @@ if args.verbose : print("\t--- %s Seconds ---" % (time.time() - start_time))
 ######################################
 #    Add info to AusMiCC database
 ######################################
-if args.add2db == 'Y':
-	print ("copying ab1 files of sequences that passed QC to database folders...")
-	amplicon_paths = path_structure.amplicon_paths()
-	p = subprocess.Popen(["rsync","-avzh",args.directory,amplicon_paths.ab1_collec], stdout=subprocess.PIPE)
-	p.wait()
+
+if args.taxonomy == 'Y':
+	print ("\nAdding info to the AusMiCC database\n")
+
+	### connect to the database:
+	aus_db_conn = fconnector.db_connection()
+	cursor = aus_db_conn.cursor()
+
+	# read taxonomy file and save taxids as a dictionary:
+	taxonomy_fp = cleanedfasta.replace(".fna", ".taxonomy")
+
+	names2tax_dic = {}
+	with open(taxonomy_fp, 'r') as a:
+		for line in a:
+			if len(line) > 1:
+				iso_name = line.split("\t")[0]
+				iso_taxid = line.split("\t")[1]
+
+				names2tax_dic[iso_name] = iso_taxid
+
+	new_db_entries = []
+	for in_file in imported_files:
+
+		entry_inf = ctables.info_16s()
+
+		if isForward(in_file):
+			primer = "7f"
+		else:
+			primer = "1510r"
+
+		#define db location, the sample name, copy file and store info in the entry_inf class obj:
+		in_file_no_dir = in_file.split("/")[-1] # input file name without directory
+
+		isolate_name_with_path = clean_header(in_file)
+		isolate_name = isolate_name_with_path.split("/")[-1]
+
+		amplicon_paths = path_structure.amplicon_paths()
+		db_loc_ab1 = amplicon_paths.ab1_collec + "/" + in_file_no_dir
+
+		entry_inf.isolate_name = isolate_name
+		entry_inf.ab1_loc = db_loc_ab1
+		entry_inf.primer = primer
+
+		# rsync files:
+		print ("rsync'ing files")
+		p = subprocess.Popen(["rsync", "-avzh", in_file, db_loc_ab1], stdout=subprocess.PIPE)
+		p.wait()
+		print("saved %s file" % (in_file))
+
+		# get partial and full len sequences:
+		if primer == "7f":
+			isolate_name_with_path_primer = isolate_name_with_path + "_Fwd"
+		else:
+			isolate_name_with_path_primer = isolate_name_with_path + "_Rev"
+		entry_inf.sequence = sequenceHash_single_end[isolate_name_with_path_primer]
+
+		#  check if it has the full len sequence:
+		if isolate_name_with_path in CombinedIdHash:
+			entry_inf.full_len_sequence = CombinedIdHash[isolate_name_with_path]
+
+		# get taxids and species:
+		lca_taxid = names2tax_dic[isolate_name_with_path]
+
+		species_n_taxid = get_sp_taxid(lca_taxid)
+
+		entry_inf.lca_taxid = lca_taxid
+		entry_inf.sp_taxid = species_n_taxid[0]
+		entry_inf.species = species_n_taxid[1]
+
+		new_db_entries.append(entry_inf)
+
+	# now add to the MySQL:
+	print ("\nInteracting with MySQL\n")
+	for obj in new_db_entries:
+		print(obj.isolate_name, obj.species)
+
+		# add info to the 16S table:
+		fadd16S.add_16S_record(obj,cursor)
+
+		#update the isolate table with species classification and full length sequences:
+		fadd16S.update_isolate_info(obj,cursor)
+
+		print ("added %s %s to the AusMiCC database" %(obj.isolate_name, obj.primer))
+
+	aus_db_conn.commit()
+	aus_db_conn.close()
+	print ("\nDone!!\n")
+
+
+#todo: if taxonomy == Y, maybe add a check in the begining to see if the isolate_names can be found in the db
+
