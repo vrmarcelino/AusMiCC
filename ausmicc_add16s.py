@@ -85,7 +85,6 @@ parser.add_argument('-b', dest='blastdb', help='The path to the blast database t
 parser.add_argument('-c', dest='cutoff', type=int, help='Percentage cutoff for OTU assignment (Must be 1, 2, 3, 5, 8 or 10) [5]')
 parser.add_argument('-k', dest='known', help='A file containing a single column of the sequence ids where the isolate has already been stored and had DNA extracted. This list will be used to populate the known OTU columns in the Results.txt file')
 parser.add_argument('-B', dest='bootstrap', type=int, default=100, help='Number of bootstraps to use when generating phylogenetic tree. [100]')
-parser.add_argument('-H', dest='leaveheader', action='store_true', help='Use this flag to specify not to alter the headers other than removing _7f/_1510r')
 parser.add_argument('-S', dest='modifyfile', help='Tab delimited file in the format: <CurrentName>\t<NewName>')
 parser.add_argument('-F', dest='forward', action='store_true', help='Use this flag to add _7f to each sequence automatically')
 parser.add_argument('-R', dest='reverse', action='store_true', help='Use this flag to add _1510r to each sequence automatically')
@@ -191,16 +190,6 @@ def clean_header(header):
 	header = header.replace("_7F", "")
 	header = header.replace("_1510r", "")
 	header = header.replace("_1510R", "")
-	if not args.leaveheader:
-		if "-" in header:
-			header = header[header.index("-"):]
-		if "_" in header:
-			header = header[header.index("_")+1:]
-		if "_" in header:
-			header = header[header.index("_")+1:]
-		a = header.split('\t')
-		if len(a) > 1:
-			header = a[0]	
 	return header
 
 #function for removing N's from the start of the sequence (start = True or start = False)

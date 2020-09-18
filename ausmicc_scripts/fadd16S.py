@@ -34,7 +34,7 @@ def update_isolate_info(in_obj,in_cursor):
         full_len_sequence = ''.join(format(i, 'b') for i in bytearray(in_obj.full_len_sequence, encoding ='utf-8'))
     else:
         full_len_sequence = None
-        print ("No full length sequence found for %s." %(in_obj.isolate_name))
+        print ("No full length sequence found for %s - only partial 16S added" %(in_obj.isolate_name))
 
     query = "UPDATE isolate set full_length_seq=%s,species=%s,species_taxid=%s WHERE idisolate=%s"
     val = (full_len_sequence,in_obj.species, in_obj.sp_taxid,idisolate)
