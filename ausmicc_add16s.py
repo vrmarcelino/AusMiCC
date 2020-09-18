@@ -64,6 +64,7 @@ cutoffhash[20] = ["-l", "8", "-u", "10"]
 FwdIdHash = {}
 RevIdHash = {}
 CombinedIdHash = {}
+CombinedSeqHash = {}
 
 oldnames = {}
 newnames = {}
@@ -321,6 +322,7 @@ def add_sequence(header, sequence):
 						#Replace sequence record with merged file
 						for seq_record in SeqIO.parse("merged.fna", "fasta"):
 							sequenceHash[id] = str(seq_record.seq.upper())
+							CombinedSeqHash[id] = str(seq_record.seq.upper())
 				
 						#Store the fact sequences were combined
 						CombinedIdHash[id] = 1
@@ -751,8 +753,8 @@ if args.taxonomy == 'Y':
 		entry_inf.sequence = sequenceHash_single_end[isolate_name_with_path_primer]
 
 		#  check if it has the full len sequence:
-		if isolate_name_with_path in CombinedIdHash:
-			entry_inf.full_len_sequence = CombinedIdHash[isolate_name_with_path]
+		if isolate_name in CombinedSeqHash:
+			entry_inf.full_len_sequence = CombinedSeqHash[isolate_name]
 
 		# get taxids and species:
 		lca_taxid = names2tax_dic[isolate_name_with_path]
@@ -768,7 +770,7 @@ if args.taxonomy == 'Y':
 	# now add to the MySQL:
 	print ("\nInteracting with MySQL\n")
 	for obj in new_db_entries:
-		print(obj.isolate_name, obj.species)
+		print(obj.isolate_name, obj.species, obj.full_len_sequence, obj.primer, obj.sequence)
 
 		# add info to the 16S table:
 		fadd16S.add_16S_record(obj,cursor)
